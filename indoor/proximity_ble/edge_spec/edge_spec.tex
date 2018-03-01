@@ -1,0 +1,69 @@
+\documentclass{article}
+\usepackage{enumitem}
+\begin{document}
+\title{The EDGES spec}
+\author{Oleksiy Grechnyev}
+\date{\today}
+\maketitle
+
+Problem: Create a graph connecting all BLE beacons (vertices).
+Let index $i = 0, ..., N_B-1$ number the vertices (beacons), where $N_B$ is the number of beacons.
+
+\begin{enumerate}[label=Step \arabic* :]
+\item  For each pair of vertices $ij$ calculate the distance $d_{ij}$. If $d_{ij}>\mathrm{MAX\_DIST}$, 
+discard this edge. If not, include edge $ij$ into the list (std::vector) \textbf{edges} only if there is strait
+white path (not crossing walls or other obstacles) between vertices $i$ and $j$. The maximum distance
+rule is important for keeping the number of edges $N_E$ linear in $N_B$ for large maps. The graph edges
+have no direction, edge $ij$ is equivalent to $ji$ and included only once.
+%
+\item Now the problem is to remove the "false edges", the ones that are doubled by two or more shorter edges.
+First, sort the list \textbf{edges} in the \emph{descending} order by the edge length.
+%
+\item Build the container (list of sets) \textbf{neighbors} with $K_i$: set of all neighbors (edge-connected
+vertices) of the vertex $i$ for $i = 0, ..., N_B-1$. The index in the sorted list  \textbf{edges} serves
+as the edge number. \textbf{edges} and \textbf{neighbors} are two different representation of the graph:
+edge-based and vertex-based. Keeping both in memory is needed for linear time.
+%
+\item Loop over all edges $ij$ starting from the longest. For each edge $ij$ build the set of triangles named
+\textbf{triangles} which includes all triangles with edge $ij$ as a side. How to do this efficiently?
+Find the set intersection $K = K_i \cap K_j$. All members of $K$ are neighbors of both $i$ and $j$,
+thus all triangles are given by $\left\{ijk\right\}, k \in K$. We have to exclude a triangle if edge $ik$
+or $jk$ is already marked as \textbf{disabled} (see below).
+
+Edge $ij$ is discarded if there is at least one triangle $ijk$ with two properties:
+\begin{enumerate}
+\item $ij$ is the longest side of the triangle (NOT equal !)
+\item One of the angles at vertices $i$ or $j$ in the triangle is smaller then $\mathrm{CRIT\_ANGLE}$
+\end{enumerate}
+Variant: if there is no $\mathrm{CRIT\_ANGLE}$, all triangles are eliminated (except for isosceles ones),
+and the graph becomes tree-like with possible loops with 4 or more vertices.
+
+The excluded edge $ij$ is marked with a boolean flag \textbf{disabled}, 
+and is obviously not considered for any future triangle candidates.
+%
+\item Finally, we remove all edges marked as \textbf{disabled}.
+\end{enumerate}
+
+Notes:
+\begin{itemize}
+\item The algorithm presented above runs in linear time (in $N_B$), provided that $N_E$
+(number of edges before deletion) it linear in $N_B$, and the maximal number of neighbors of any vertex
+is bounded by a constant $N_N$ independent on $N_B$. $O(N)$
+time is a very good thing for an algorithm. The memory use is also $O(N)$.
+%
+\item The algorithm is deterministic and independent on the vertex numbering.
+% 
+\end{itemize}
+
+Possible C++ variables:
+\begin{verbatim}
+struct Edge{
+    int i,j; // Vertices
+    double d; // Length
+    bool disabled = false;
+};
+std::vector<Edge> edges;
+std::vector<std::set<int>> neighbors;
+\end{verbatim}
+
+\end{document}
